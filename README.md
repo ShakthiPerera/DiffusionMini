@@ -1,2 +1,2 @@
 # Diffusion2D
-Diffusion for Coordinate Datasets
+Diffusion model for Coordinate Datasets
