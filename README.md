@@ -1,2 +1,2 @@
-# Diffusion2D
+# DiffusionMini
 Diffusion model for Coordinate Datasets
