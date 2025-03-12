@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-from functions.losses import default_loss
+from functions.losses import default_loss, iso_loss
 
 class DDPM(pl.LightningModule):
     '''
@@ -36,11 +36,12 @@ class DDPM(pl.LightningModule):
                  betas,
                  criterion='mse',
                  lr=1e-04,
-                 ):
+                 loss_type='default'):
         super().__init__()
 
         # set trainable epsilon model
         self.eps_model = eps_model
+        self.loss_type = loss_type
 
         # set loss function criterion
         if criterion == 'mse':
@@ -209,8 +210,11 @@ class DDPM(pl.LightningModule):
         
         # predict eps based on noisy x and t
         eps_pred = self.eps_model(x_noisy, ts)
-        
-        loss, norm_loss = default_loss(x, eps_pred, eps, self.criterion)
+
+        if self.loss_type == 'default':
+            loss, norm_loss = default_loss(x, eps_pred, eps, self.criterion)
+        elif self.loss_type == 'iso':
+            loss, norm_loss = iso_loss(x, eps_pred, self.criterion)
 
         return loss, loss, norm_loss
 
