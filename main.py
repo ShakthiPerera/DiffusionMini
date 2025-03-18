@@ -1,14 +1,10 @@
-# from runners.ddpm_default import DDPM as ddpm
-# from models import ConditionalDenseModel
-# from functions import make_beta_schedule
-# import torch 
-# from tqdm import tqdm 
-# from torch.utils.data import DataLoader, TensorDataset
-# from sklearn.model_selection import train_test_split
-# from sklearn.datasets import make_swiss_roll
-# from sklearn.preprocessing import MinMaxScaler
 import argparse 
+from sklearn.model_selection import train_test_split
 
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+from datasets import EightGaussiansDataset, MoonDataset, BananaWithTwoCirclesDataset, SCurveDataset, SwissRollDataset
 
 def parse_args():
     def restricted_float(x):
@@ -55,9 +51,46 @@ def parse_args():
                         help='GPU device ID, single non-negative integer (default: 0)')
     parser.add_argument('--num_samples', type=positive_int, default=10000,
                         help='Number of samples for dataset creation/sampling, > 0 (default: 10000)')
-
+    parser.add_argument('--seed', type=positive_int, default=42,
+                        help='Random state number for reproducibility')
+    parser.add_argument('-b', '--batch_size', type=positive_int, default=64,
+                        help='Size of the batches for training.')
     args = parser.parse_args()
     return args
+
+def load_dataset(dataset_name, num_samples, batch_size, random_state):
+    '''
+    Loading the dataset for given argeparse properties
+
+    Args:
+        dataset_name (str): name of the dataset 
+        num_samples (int): number of samples you want
+        batch_size (int) : batch size for the dataset 
+        random_state (int): random state fro reproducibility
+    '''
+    if dataset_name == "8-gaussian":
+        ds = EightGaussiansDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "swiss_roll":
+        ds = SwissRollDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "moons":
+        ds = MoonDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "s_curve":
+        ds = SCurveDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "banana_with_two_circles":
+        ds = BananaWithTwoCirclesDataset(num_samples, random_state)
+        X = ds.generate()
+
+    X_train, _ = train_test_split(X, test_size=0.2)
+    X_train = torch.tensor(X_train).float()
+    train_set = TensorDataset(X_train)
+    train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=2, pin_memory=True)
+
+    return ds, train_loader
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -68,44 +101,12 @@ if __name__ == "__main__":
     print(f"Num Epochs: {args.num_epoch}")
     print(f"GPU ID: {args.gpu_id}")
     print(f"Num Samples: {args.num_samples}")
+    print(f"Random State: {args.seed}")
+    print(f"Batch Size: {args.batch_size}")
 
-
-# X, _ = make_swiss_roll(10000, noise=0.5, random_state=42)
-
-# # Restrict to 2D
-# X = X[:,[0,2]]
-
-# # Normalize to be between -1 and 1
-# scaler = MinMaxScaler(feature_range=(-1, 1))
-# X_normalized = scaler.fit_transform(X)
-
-# X_train, X_val = train_test_split(X_normalized, test_size=0.2)
-
-# X_train = torch.tensor(X_train).float()
-# X_val = torch.tensor(X_val).float()
-
-# train_set = TensorDataset(X_train)
-# val_set = TensorDataset(X_val)
-
-# batch_size = 64
-
-# train_loader = DataLoader(
-#     train_set,
-#     batch_size=batch_size,
-#     drop_last=True,
-#     shuffle=True,
-#     num_workers=2,
-#     pin_memory=True
-# )
-
-# val_loader = DataLoader(
-#     val_set,
-#     batch_size=batch_size,
-#     drop_last=False,
-#     shuffle=False,
-#     num_workers=2,
-#     pin_memory=True
-# )
+    ds, X = load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
+    print(type(X))
+    ds.plot_dataset()
 
 
 # def create_model(num_features=[2, 128, 128, 128, 2]):
