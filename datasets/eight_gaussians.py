@@ -1,6 +1,5 @@
 import numpy as np
-from base_dataset_class import BaseDataset2D
-
+from .base_dataset_class import BaseDataset2D
 class EightGaussiansDataset(BaseDataset2D):
     def __init__(self, num_samples=10000, dataset_name ='8_Gaussians', random_state=42):
         super().__init__(num_samples, dataset_name, random_state)

@@ -1,5 +1,5 @@
 import numpy as np
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class BananaWithTwoCirclesDataset(BaseDataset2D):
     circle_center1=(-0.4, 0.5)

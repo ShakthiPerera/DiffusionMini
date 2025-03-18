@@ -1,5 +1,5 @@
 from sklearn.datasets import make_swiss_roll
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class SwissRollDataset(BaseDataset2D):
     def __init__(self, num_samples=10000, dataset_name ='Swiss_Roll', random_state=42, noise_level = 0.5):
