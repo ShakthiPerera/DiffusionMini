@@ -5,6 +5,9 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 
 from datasets import EightGaussiansDataset, MoonDataset, BananaWithTwoCirclesDataset, SCurveDataset, SwissRollDataset
+from models import ConditionalDenseModel
+from functions import make_beta_schedule
+from runners.ddpm_default import DDPM as ddpm
 
 def parse_args():
     def restricted_float(x):
@@ -55,6 +58,12 @@ def parse_args():
                         help='Random state number for reproducibility')
     parser.add_argument('-b', '--batch_size', type=positive_int, default=64,
                         help='Size of the batches for training.')
+    parser.add_argument('--schedule', type=str, default='linear',
+                        help='beta schedule type')
+    parser.add_argument('--lr', type=float, default=1e-4,
+                        help='learning rate')
+    parser.add_argument('--hl', type=list, default=[2, 128, 128, 128, 2],
+                        help='hidden layers size for noise prediction')
     args = parser.parse_args()
     return args
 
@@ -91,6 +100,25 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
 
     return ds, train_loader
 
+def create_model(loss_type, schedule_type, learning_rate, num_features):
+    '''
+    Creating the DDPM model instance for the training
+
+    Args:
+        loss_type (str): loss type (iso, default)
+        schedule_type (str): schedule variation type (linear, quadratic, cosine ..)
+        learning_rate (float): models' learning rate
+        num_features (list, optional): Conditional models hidden layers sizes for noise prediction. Defaults to [2, 128, 128, 128, 2].
+
+    Returns:
+        torch.model: model instanace
+    '''
+    eps_model = ConditionalDenseModel(num_features, activation='relu', embed_dim=10)
+    betas = make_beta_schedule(num_steps=1000, mode=schedule_type, beta_range=(1e-04, 0.02))
+
+    ddpm_model = ddpm(eps_model=eps_model, betas=betas, criterion='mse', lr=learning_rate, loss_type=loss_type)
+
+    return ddpm_model
 
 if __name__ == "__main__":
     args = parse_args()
@@ -103,20 +131,17 @@ if __name__ == "__main__":
     print(f"Num Samples: {args.num_samples}")
     print(f"Random State: {args.seed}")
     print(f"Batch Size: {args.batch_size}")
+    print(f"Schedule Type: {args.schedule}")
+    print(f"Learning Rate: {args.lr}")
+    print(f"Hidden Layer Dims: {args.hl}")
 
     ds, X = load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
     print(type(X))
     ds.plot_dataset()
+    model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
+    print(model)
 
 
-# def create_model(num_features=[2, 128, 128, 128, 2]):
-
-#     eps_model = ConditionalDenseModel(num_features, activation='relu', embed_dim=10)
-#     betas = make_beta_schedule(num_steps=1000, mode='linear', beta_range=(1e-04, 0.02))
-
-#     ddpm_model = ddpm(eps_model=eps_model, betas=betas, criterion='mse', lr=1e-03)
-
-#     return ddpm_model
 
 # def train(ddpm, device, num_epochs=1000):
 #     # Training loop
