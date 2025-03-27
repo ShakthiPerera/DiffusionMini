@@ -4,10 +4,10 @@ class EightGaussiansDataset(BaseDataset2D):
     def __init__(self, num_samples=10000, dataset_name ='8_Gaussians', random_state=42):
         super().__init__(num_samples, dataset_name, random_state)
     
-    def pdf(self, mean, covariance, size):
-        rng = np.random.default_rng(self.random_state)
-        return rng.multivariate_normal(mean, covariance, size)
-    
+    def pdf(self, distribution, params, size):
+        if distribution == "multivariate_normal":
+            return self.random_multivariate_normal(params["mean"], params["covariance"], size)
+        
     def generate(self):
         # Number of data points per Gaussian
         n_points = int(self.num_samples / 8)
@@ -22,7 +22,7 @@ class EightGaussiansDataset(BaseDataset2D):
         # Generate data points for each Gaussian
         X = np.zeros((len(means) * n_points, 2))
         for i, mean in enumerate(means):
-            X[i * n_points:(i + 1) * n_points] = self.pdf(mean, covariance, n_points)
+            X[i * n_points:(i + 1) * n_points] = self.pdf(distribution="multivariate_normal", params={"mean":mean, "covariance":covariance}, size=n_points)
 
         X = self.normalize(X)
         self.data = X

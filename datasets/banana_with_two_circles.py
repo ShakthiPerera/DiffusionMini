@@ -17,23 +17,12 @@ class BananaWithTwoCirclesDataset(BaseDataset2D):
         return max_distance * (np.exp(-decay * theta) * (1 + concentration_factor * np.sin(theta)))
 
     def pdf(self, distribution, params, size=None):
-        rng = np.random.default_rng(self.random_state)
-        
-        """
-        Generates random numbers based on the specified distribution and parameters.
-
-        :param distribution: str, type of distribution ('exponential', 'uniform', 'standard_normal')
-        :param params: dict, parameters required for the distribution
-        :param size: int or tuple, shape of the output array
-        :return: Generated random numbers
-        """
-        
         if distribution == "exponential":
-            return rng.exponential(params["scale"], size)
+            return self.random_exponential(params["scale"], size)
         elif distribution == "uniform":
-            return rng.uniform(params["low"], params["high"], size)
+            return self.random_uniform(params["low"], params["high"], size)
         elif distribution == "standard_normal":
-            return rng.standard_normal(size)
+            return self.random_standard_normal(size)
     
     def generate_banana_points(self, sigma=0.3, max_distance=1.0):
         X = []

@@ -28,11 +28,14 @@ class BaseDataset2D:
     def random_exponential(self, scale, size=None):
         return self.rng.exponential(scale, size)
     
-    def random_multivariate_normal(self, mean, covariance, size):
+    def random_multivariate_normal(self, mean, covariance, size=None):
         return self.rng.multivariate_normal(mean, covariance, size)
     
     def random_standard_normal(self, size=None):
         return self.rng.standard_normal(size)
+    
+    def random_shuffle(self, data):
+        return self.rng.shuffle(data)
     
     def plot_dataset(self, contours=True):
         if self.data is None:
