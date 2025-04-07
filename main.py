@@ -1,5 +1,6 @@
 import argparse 
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -41,7 +42,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Model training script")
 
     parser.add_argument('--dataset', type=str, required=True,
-                        help='Dataset name (required)')
+                        help='Dataset name (required) {}')
     parser.add_argument('--loss_type', type=valid_loss_type, default='default',
                         help='Loss function type: "default" or "iso" (default: default)')
     parser.add_argument('--log_dir', type=str, required=True,
@@ -90,7 +91,7 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
         ds = SCurveDataset(num_samples, random_state)
         X = ds.generate()
     elif dataset_name == "banana_with_two_circles":
-        ds = BananaDataset(num_samples, random_state)
+        ds = BananaWithTwoCirclesDataset(num_samples, random_state)
         X = ds.generate()
     elif dataset_name == "banana":
         ds = BananaDataset(num_samples, random_state)
@@ -144,6 +145,20 @@ def create_model(loss_type, schedule_type, learning_rate, num_features):
 
     return ddpm_model
 
+def train(model, train_loader, device, num_epochs=1000):
+    model.to(device)
+    iters = len(train_loader)
+    model.train()
+    for epoch in range(num_epochs):
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", dynamic_ncols=True)
+        running_loss = 0
+        for batch in pbar:
+            x_batch = torch.stack(batch).to(device)
+            loss, simple_loss, norm_loss = model.train_step(x_batch)
+            running_loss += loss
+            pbar.set_postfix(loss=running_loss / (pbar.n + 1))
+            
+
 if __name__ == "__main__":
     args = parse_args()
     print(f"Dataset: {args.dataset}")
@@ -160,9 +175,11 @@ if __name__ == "__main__":
 
     ds, X = load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
     print(type(X))
-    ds.plot_dataset()
+    # ds.plot_dataset()
     model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
     print(model)
+    device = f'cuda:{args.gpu_id}' if torch.cuda.is_available() else "cpu"
+    train(model, X, device, num_epochs=10)
 
 
 
