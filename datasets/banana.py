@@ -1,5 +1,5 @@
 import numpy as np
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class BananaDataset(BaseDataset2D):
     sigma = 0.3

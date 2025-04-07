@@ -1,5 +1,5 @@
 import numpy as np
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class StarFishUniform(BaseDataset2D):
     def __init__(self, num_samples=10000, dataset_name='Star_fish_uniform', random_state=42):

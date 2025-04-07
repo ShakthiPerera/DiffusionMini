@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class StarFishDecay(BaseDataset2D):
     

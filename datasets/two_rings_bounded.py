@@ -1,5 +1,5 @@
 import numpy as np
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class TwoRingsBounded(BaseDataset2D):
     def __init__(self, num_samples=10000, dataset_name='Two_rings_bounded', random_state=42):

@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_moons
-from base_dataset_class import BaseDataset2D
+from .base_dataset_class import BaseDataset2D
 
 class MoonWithTwoCircles(BaseDataset2D):
     noise_level=0.1
