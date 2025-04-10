@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from .base_dataset_class import BaseDataset2D
 
-class StarFishDecay(BaseDataset2D):
+class StarFishDecayDataset(BaseDataset2D):
     
     def __init__(self, num_samples=10000, dataset_name='Star_fish_decay', random_state=42):
         super().__init__(num_samples, dataset_name, random_state)

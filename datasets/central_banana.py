@@ -1,7 +1,7 @@
 import numpy as np
 from .base_dataset_class import BaseDataset2D
 
-class CentralBanana(BaseDataset2D):
+class CentralBananaDataset(BaseDataset2D):
     central_point = 500
     
     def __init__(self, num_samples=10000, dataset_name='Central_Banana', random_state=42):

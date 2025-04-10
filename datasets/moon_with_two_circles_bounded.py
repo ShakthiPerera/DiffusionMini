@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.datasets import make_moons
 from .base_dataset_class import BaseDataset2D
 
-class MoonWithTwoCiclesBounded(BaseDataset2D):
+class MoonWithTwoCiclesBoundedDataset(BaseDataset2D):
     noise_level = 0.1
     crescent_class = 0
     crescent_bounds = (-2, 2, -1.5, 1.5)

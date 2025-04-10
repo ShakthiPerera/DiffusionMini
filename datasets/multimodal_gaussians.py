@@ -1,7 +1,7 @@
 import numpy as np
 from .base_dataset_class import BaseDataset2D
 
-class MultimodalGasussians(BaseDataset2D):
+class MultimodalGasussiansDataset(BaseDataset2D):
     
     def __init__(self, num_samples=10000, dataset_name='Multimodal_Gaussians', random_state=42):
          super().__init__(num_samples, dataset_name, random_state)

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.datasets import make_moons
 from .base_dataset_class import BaseDataset2D
 
-class MoonWithTwoCircles(BaseDataset2D):
+class MoonWithTwoCirclesUnboundedDataset(BaseDataset2D):
     noise_level=0.1
     crescent_class=0 
     circle_center1=(-1.5, -1.0)
