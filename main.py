@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
-from datasets import EightGaussiansDataset, MoonDataset, BananaWithTwoCirclesDataset, SCurveDataset, SwissRollDataset, BananaDataset, CentralBanana, MoonWithScatterings, MoonWithTwoCiclesBounded, MoonWithTwoCircles, MultimodalGasussians, StarFishDecay, StarFishUniform, TwoRingsBounded
+from datasets import BananaWithTwoCirclesDataset, BananaDataset, CentralBananaDataset, EightGaussiansDataset, MoonWithScatteringsDataset, MoonWithTwoCiclesBoundedDataset, MoonWithTwoCirclesUnboundedDataset, MoonDataset, MultimodalGasussiansDataset, SCurveDataset, StarFishDecayDataset, StarFishUniformDataset, SwissRollDataset, TwoRingsBoundedDataset
 from models import ConditionalDenseModel
 from functions import make_beta_schedule
 from runners.ddpm_default import DDPM as ddpm
@@ -78,44 +78,47 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
         batch_size (int) : batch size for the dataset 
         random_state (int): random state fro reproducibility
     '''
-    if dataset_name == "8-gaussian":
-        ds = EightGaussiansDataset(num_samples, random_state)
-        X = ds.generate()
-    elif dataset_name == "swiss_roll":
-        ds = SwissRollDataset(num_samples, random_state)
-        X = ds.generate()
-    elif dataset_name == "moons":
-        ds = MoonDataset(num_samples, random_state)
-        X = ds.generate()
-    elif dataset_name == "s_curve":
-        ds = SCurveDataset(num_samples, random_state)
-        X = ds.generate()
-    elif dataset_name == "banana_with_two_circles":
+    if dataset_name == "Banana_with_two_circles":
         ds = BananaWithTwoCirclesDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "banana":
+    elif dataset_name == "Banana":
         ds = BananaDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "central_banana":
-        ds = CentralBanana(num_samples, random_state)
+    elif dataset_name == "Central_Banana":
+        ds = CentralBananaDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "moon_with_scattering":
-        ds = MoonWithScatterings(num_samples, random_state)
+    elif dataset_name == "8_Gaussians":
+        ds = EightGaussiansDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "moon_with_two_circles_bounded":
-        ds = MoonWithTwoCiclesBounded(num_samples, random_state)
+    elif dataset_name == "Moon_with_scatterings":
+        ds = MoonWithScatteringsDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "moon_with_two_circles":
-        ds = MoonWithTwoCircles(num_samples, random_state)
+    elif dataset_name == "Moon_with_two_circles_bounded":
+        ds = MoonWithTwoCiclesBoundedDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "multi_modal_gaussians":
-        ds = MultimodalGasussians(num_samples, random_state)
+    elif dataset_name == "MoonWithTwoCirclesUnboundedDataset":
+        ds = MoonWithTwoCirclesUnboundedDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "star_fish_decay":
-        ds = StarFishDecay(num_samples, random_state)
+    elif dataset_name == "Moons":
+        ds = MoonDataset(num_samples, random_state)
         X = ds.generate()
-    elif dataset_name == "two_rings_bounded":
-        ds = TwoRingsBounded(num_samples, random_state)
+    elif dataset_name == "Multimodal_Gaussians":
+        ds = MultimodalGasussiansDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "S_Curve":
+        ds = SCurveDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "Star_fish_decay":
+        ds = StarFishDecayDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "Star_fish_uniform":
+        ds = StarFishUniformDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "Swiss_Roll":
+        ds = SwissRollDataset(num_samples, random_state)
+        X = ds.generate()
+    elif dataset_name == "Two_rings_bounded":
+        ds = TwoRingsBoundedDataset(num_samples, random_state)
         X = ds.generate()
 
     X_train, _ = train_test_split(X, test_size=0.2)
