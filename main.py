@@ -237,7 +237,7 @@ def train(model, train_loader, device, num_epochs=1000):
             running_loss += loss
             pbar.set_postfix(loss=running_loss / (pbar.n + 1))
 
-def plot_step_by_step_noise(x_noisy, path):
+def plot_step_by_step_noise(x_noisy,x_denoise,path):
     plot_steps = range(0, 1001, 20)
     colors = plt.cm.cividis(np.linspace(0.0, 1, len(plot_steps)))
     for time_idx, color in zip(plot_steps, colors):
@@ -250,6 +250,23 @@ def plot_step_by_step_noise(x_noisy, path):
         plt.tight_layout()
         plt.savefig(f"{path}/forward_diff_step_{time_idx}.png")
         plt.clf()
+
+    # plot_steps_reverse = range(1000, -1, 20)
+    colors = plt.cm.cividis(np.linspace(1.0, 0.0, len(plot_steps)))
+
+    for time_idx, color in zip(plot_steps, colors):
+        samples = x_denoise[time_idx].cpu().numpy()
+        plt.scatter(samples[:,0], samples[:,1], s=4, alpha=0.7, color=color ,edgecolors='none')
+        plt.xlim(-3, 3)
+        plt.ylim(-3, 3)
+        plt.title('{} steps'.format(time_idx))
+        # ax.set(xticks=[], yticks=[], xlabel='', ylabel='')
+        plt.tight_layout()
+        plt.savefig(f"{path}/reverse_diff_steps_part_{time_idx}.png")
+        plt.clf()
+
+
+
 
 
 
@@ -295,11 +312,8 @@ if __name__ == "__main__":
 
     X_train = X_train.to(device)
     x_noisy = model.diffuse_all_steps(X_train)
-    plot_step_by_step_noise(x_noisy, path_plots)
-
-
-
-
+    x_denoise, x_eps = model.denoise_all_steps(torch.randn(10000, 2).to(device))
+    plot_step_by_step_noise(x_noisy, x_denoise, path_plots)
 
 
 
