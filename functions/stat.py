@@ -4,6 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def whiteness_measures(data):
+    cov_matrix = np.cov(data, rowvar=False)
+    eigenvalues = np.linalg.eigvals(cov_matrix)
+    isotropy_ratio = np.max(eigenvalues) / np.min(eigenvalues)
+
+    alpha = np.mean(eigenvalues)
+    identity_matrix = np.eye(cov_matrix.shape[0])
+    frobenius_norm_diff = np.linalg.norm(cov_matrix - identity_matrix, ord="fro")
+
+    return isotropy_ratio, frobenius_norm_diff
+
+
 def kurtosis_(data):
     kurtosis_ = kurtosis(data, fisher=True)
     return kurtosis_
