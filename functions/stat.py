@@ -26,6 +26,33 @@ def isotropy(data):
     return iso
 
 
+def metric_plot(
+    metric_values, metric_name, ylim, save_name, smoothed=False, window_size=50
+):
+    plt.figure(figsize=(8, 6))
+
+    # Define the window size for the moving average
+    window_size = window_size
+
+    # Compute the moving average
+    if smoothed:
+        smoothed_metric = np.convolve(
+            metric_values, np.ones(window_size) / window_size, mode="same"
+        )
+        smoothed_metric[:window_size] = metric_values[:window_size]
+        plt.plot(smoothed_metric, label=f"{metric_name}")
+    else:
+        plt.plot(metric_values, label=f"{metric_name}")
+    plt.legend()
+    plt.xlabel("Time Steps")
+    plt.ylabel(f"{metric_name} Values")
+    plt.title(f"{metric_name} Plot ")
+    if not ylim is None:
+        plt.ylim(*ylim)
+    plt.grid(True)
+    plt.savefig(f"{path}/{save_name}.png")
+
+
 def kurtosis_plot(metric_values, metric_name, ylim, save_name):
     plt.figure(figsize=(8, 6))
 
