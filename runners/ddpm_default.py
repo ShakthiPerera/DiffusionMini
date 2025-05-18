@@ -5,8 +5,9 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from functions.losses import default_loss, iso_loss
 
+
 class DDPM(pl.LightningModule):
-    '''
+    """
     Plain vanilla DDPM module.
 
     Summary
@@ -29,14 +30,11 @@ class DDPM(pl.LightningModule):
     lr : float
         Optimizer learning rate.
 
-    '''
+    """
 
-    def __init__(self,
-                 eps_model,
-                 betas,
-                 criterion='mse',
-                 lr=1e-04,
-                 loss_type='default'):
+    def __init__(
+        self, eps_model, betas, criterion="mse", lr=1e-04, loss_type="default"
+    ):
         super().__init__()
 
         # set trainable epsilon model
@@ -44,61 +42,63 @@ class DDPM(pl.LightningModule):
         self.loss_type = loss_type
 
         # set loss function criterion
-        if criterion == 'mse':
-            self.criterion = nn.MSELoss(reduction='mean')
-        elif criterion == 'mae':
-            self.criterion = nn.L1Loss(reduction='mean')
+        if criterion == "mse":
+            self.criterion = nn.MSELoss(reduction="mean")
+        elif criterion == "mae":
+            self.criterion = nn.L1Loss(reduction="mean")
         elif callable(criterion):
             self.criterion = criterion
         else:
-            raise ValueError('Criterion could not be determined')
+            raise ValueError("Criterion could not be determined")
 
         # set initial learning rate
         self.lr = abs(lr)
 
-        
         # to save losses
         self.train_losses = []
-        
+
         # optimizer
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)    
-        
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
 
         # set scheduling parameters
-        betas = torch.as_tensor(betas).view(-1) # note that betas[0] corresponds to t = 1.0
+        betas = torch.as_tensor(betas).view(
+            -1
+        )  # note that betas[0] corresponds to t = 1.0
 
         if betas.min() <= 0 or betas.max() >= 1:
-            raise ValueError('Invalid beta values encountered')
+            raise ValueError("Invalid beta values encountered")
 
         alphas = 1.0 - betas
         alphas_bar = torch.cumprod(alphas, dim=0)
 
         betas_tilde = (1 - alphas_bar[:-1]) / (1 - alphas_bar[1:]) * betas[1:]
-        betas_tilde = nn.functional.pad(betas_tilde, pad=(1, 0), value=0.0) # ensure betas_tilde[0] = 0.0
+        betas_tilde = nn.functional.pad(
+            betas_tilde, pad=(1, 0), value=0.0
+        )  # ensure betas_tilde[0] = 0.0
 
-        self.register_buffer('betas', betas)
-        self.register_buffer('alphas', alphas)
-        self.register_buffer('alphas_bar', alphas_bar)
-        self.register_buffer('betas_tilde', betas_tilde)
+        self.register_buffer("betas", betas)
+        self.register_buffer("alphas", alphas)
+        self.register_buffer("alphas_bar", alphas_bar)
+        self.register_buffer("betas_tilde", betas_tilde)
 
     @property
     def num_steps(self):
-        '''Get the total number of time steps.'''
+        """Get the total number of time steps."""
         return len(self.betas)
 
     def forward(self, x, t):
-        '''Run the noise-predicting model.'''
+        """Run the noise-predicting model."""
         return self.eps_model(x, t)
 
     def diffuse_step(self, x, tidx):
-        '''Simulate single forward process step.'''
+        """Simulate single forward process step."""
         beta = self.betas[tidx]
         eps = torch.randn_like(x)
         x_noisy = (1 - beta).sqrt() * x + beta.sqrt() * eps
         return x_noisy
 
     def diffuse_all_steps_till_time(self, x0, time):
-        '''Simulate and return all forward process steps.'''
+        """Simulate and return all forward process steps."""
         x_noisy = torch.zeros(time + 1, *x0.shape, device=x0.device)
         x_noisy[0] = x0
         for tidx in range(time):
@@ -106,7 +106,7 @@ class DDPM(pl.LightningModule):
         return x_noisy
 
     def diffuse_all_steps(self, x0):
-        '''Simulate and return all forward process steps.'''
+        """Simulate and return all forward process steps."""
         x_noisy = torch.zeros(self.num_steps + 1, *x0.shape, device=x0.device)
         x_noisy[0] = x0
         for tidx in range(self.num_steps):
@@ -114,7 +114,7 @@ class DDPM(pl.LightningModule):
         return x_noisy
 
     def diffuse(self, x0, tids, return_eps=False):
-        '''Simulate multiple forward steps at once.'''
+        """Simulate multiple forward steps at once."""
         alpha_bar = self.alphas_bar[tids]
         eps = torch.randn_like(x0)
 
@@ -129,10 +129,12 @@ class DDPM(pl.LightningModule):
             return x_noisy
 
     def denoise_step(self, x, tids, random_sample=False):
-        '''Perform single reverse process step.'''
+        """Perform single reverse process step."""
         # set up time variables
-        tids = torch.as_tensor(tids, device=x.device).view(-1, 1) # ensure (batch_size>=1, 1)-shaped tensor
-        ts = tids.to(x.dtype) + 1 # note that tidx = 0 corresponds to t = 1.0
+        tids = torch.as_tensor(tids, device=x.device).view(
+            -1, 1
+        )  # ensure (batch_size>=1, 1)-shaped tensor
+        ts = tids.to(x.dtype) + 1  # note that tidx = 0 corresponds to t = 1.0
 
         # predict eps based on noisy x and t
         eps_pred = self.eps_model(x, ts)
@@ -163,25 +165,31 @@ class DDPM(pl.LightningModule):
 
     @torch.no_grad()
     def denoise_all_steps(self, xT):
-        '''Perform and return all reverse process steps.'''
+        """Perform and return all reverse process steps."""
         x_denoised = torch.zeros(self.num_steps + 1, *(xT.shape), device=xT.device)
         x_eps = torch.zeros(self.num_steps + 1, *(xT.shape), device=xT.device)
-        
+
         x_denoised[0] = xT
         for idx, tidx in enumerate(reversed(range(self.num_steps))):
             # generate random sample
             if tidx > 0:
-                x_denoised[idx + 1], x_eps[idx] = self.denoise_step(x_denoised[idx], tidx, random_sample=True)
+                x_denoised[idx + 1], x_eps[idx] = self.denoise_step(
+                    x_denoised[idx], tidx, random_sample=True
+                )
             # take the mean in the last step
             else:
-                x_denoised[idx + 1], _, x_eps[idx] = self.denoise_step(x_denoised[idx], tidx, random_sample=False)
+                x_denoised[idx + 1], _, x_eps[idx] = self.denoise_step(
+                    x_denoised[idx], tidx, random_sample=False
+                )
 
         return x_denoised, x_eps
 
     @torch.no_grad()
     def generate(self, sample_shape, num_samples=1):
-        '''Generate random samples through the reverse process.'''
-        x_denoised = torch.randn(num_samples, *sample_shape, device=self.device) # Lightning modules have a device attribute
+        """Generate random samples through the reverse process."""
+        x_denoised = torch.randn(
+            num_samples, *sample_shape, device=self.device
+        )  # Lightning modules have a device attribute
         isotropy = []
         for tidx in reversed(range(self.num_steps)):
             # generate random sample
@@ -191,29 +199,30 @@ class DDPM(pl.LightningModule):
                 # isotropy.append(iso)
             # take the mean in the last step
             else:
-                x_denoised, _, _ = self.denoise_step(x_denoised, tidx, random_sample=False)
+                x_denoised, _, _ = self.denoise_step(
+                    x_denoised, tidx, random_sample=False
+                )
                 # iso = self.isotropy(x_denoised)
                 # isotropy.append(iso)
 
         return x_denoised
 
-    
     def loss(self, x):
-        '''Compute stochastic loss.'''
+        """Compute stochastic loss."""
         #  draw random time steps
         tids = torch.randint(0, self.num_steps, size=(x.shape[0], 1), device=x.device)
-        
-        ts = tids.to(x.dtype) + 1 # note that tidx = 0 corresponds to t = 1.0
-        
+
+        ts = tids.to(x.dtype) + 1  # note that tidx = 0 corresponds to t = 1.0
+
         # perform forward process steps
         x_noisy, eps = self.diffuse(x, tids, return_eps=True)
-        
+
         # predict eps based on noisy x and t
         eps_pred = self.eps_model(x_noisy, ts)
 
-        if self.loss_type == 'default':
+        if self.loss_type == "default":
             loss, norm_loss = default_loss(x, eps_pred, eps, self.criterion)
-        elif self.loss_type == 'iso':
+        elif self.loss_type == "iso":
             loss, norm_loss = iso_loss(x, eps_pred, self.criterion)
 
         return loss, loss, norm_loss
@@ -233,7 +242,7 @@ class DDPM(pl.LightningModule):
 
     def get_iso_difference_list(self):
         return self.iso_difference_list
-    
+
     def validate(self, val_loader):
         self.eval()
         val_loss = 0.0

@@ -1,14 +1,30 @@
-import argparse 
+import argparse
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
-from datasets import BananaWithTwoCirclesDataset, BananaDataset, CentralBananaDataset, EightGaussiansDataset, MoonWithScatteringsDataset, MoonWithTwoCiclesBoundedDataset, MoonWithTwoCirclesUnboundedDataset, MoonDataset, MultimodalGasussiansDataset, SCurveDataset, StarFishDecayDataset, StarFishUniformDataset, SwissRollDataset, TwoRingsBoundedDataset
+from datasets import (
+    BananaWithTwoCirclesDataset,
+    BananaDataset,
+    CentralBananaDataset,
+    EightGaussiansDataset,
+    MoonWithScatteringsDataset,
+    MoonWithTwoCiclesBoundedDataset,
+    MoonWithTwoCirclesUnboundedDataset,
+    MoonDataset,
+    MultimodalGasussiansDataset,
+    SCurveDataset,
+    StarFishDecayDataset,
+    StarFishUniformDataset,
+    SwissRollDataset,
+    TwoRingsBoundedDataset,
+)
 from models import ConditionalDenseModel
 from functions import make_beta_schedule
 from runners.ddpm_default import DDPM as ddpm
+
 
 def parse_args():
     def restricted_float(x):
@@ -35,49 +51,87 @@ def parse_args():
     def valid_loss_type(x):
         """Restrict loss_type to 'default' or 'iso'."""
         x = x.lower()
-        if x not in ['default', 'iso']:
-            raise argparse.ArgumentTypeError(f"loss_type must be 'default' or 'iso', got {x}")
+        if x not in ["default", "iso"]:
+            raise argparse.ArgumentTypeError(
+                f"loss_type must be 'default' or 'iso', got {x}"
+            )
         return x
 
     parser = argparse.ArgumentParser(description="Model training script")
 
-    parser.add_argument('--dataset', type=str, required=True,
-                        help='Dataset name (required) {}')
-    parser.add_argument('--loss_type', type=valid_loss_type, default='default',
-                        help='Loss function type: "default" or "iso" (default: default)')
-    parser.add_argument('--log_dir', type=str, required=True,
-                        help='Directory to save logs (required)')
-    parser.add_argument('--reg', type=restricted_float, default=0.0,
-                        help='Regularization strength in (0, 1] (default: 0.0)')
-    parser.add_argument('--num_epoch', type=positive_int, default=1000,
-                        help='Number of training epochs, > 0 (default: 1000)')
-    parser.add_argument('--gpu_id', type=non_negative_int, default=0,
-                        help='GPU device ID, single non-negative integer (default: 0)')
-    parser.add_argument('--num_samples', type=positive_int, default=10000,
-                        help='Number of samples for dataset creation/sampling, > 0 (default: 10000)')
-    parser.add_argument('--seed', type=positive_int, default=42,
-                        help='Random state number for reproducibility')
-    parser.add_argument('-b', '--batch_size', type=positive_int, default=64,
-                        help='Size of the batches for training.')
-    parser.add_argument('--schedule', type=str, default='linear',
-                        help='beta schedule type')
-    parser.add_argument('--lr', type=float, default=1e-4,
-                        help='learning rate')
-    parser.add_argument('--hl', type=list, default=[2, 128, 128, 128, 2],
-                        help='hidden layers size for noise prediction')
+    parser.add_argument(
+        "--dataset", type=str, required=True, help="Dataset name (required) {}"
+    )
+    parser.add_argument(
+        "--loss_type",
+        type=valid_loss_type,
+        default="default",
+        help='Loss function type: "default" or "iso" (default: default)',
+    )
+    parser.add_argument(
+        "--log_dir", type=str, required=True, help="Directory to save logs (required)"
+    )
+    parser.add_argument(
+        "--reg",
+        type=restricted_float,
+        default=0.0,
+        help="Regularization strength in (0, 1] (default: 0.0)",
+    )
+    parser.add_argument(
+        "--num_epoch",
+        type=positive_int,
+        default=1000,
+        help="Number of training epochs, > 0 (default: 1000)",
+    )
+    parser.add_argument(
+        "--gpu_id",
+        type=non_negative_int,
+        default=0,
+        help="GPU device ID, single non-negative integer (default: 0)",
+    )
+    parser.add_argument(
+        "--num_samples",
+        type=positive_int,
+        default=10000,
+        help="Number of samples for dataset creation/sampling, > 0 (default: 10000)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=positive_int,
+        default=42,
+        help="Random state number for reproducibility",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=positive_int,
+        default=64,
+        help="Size of the batches for training.",
+    )
+    parser.add_argument(
+        "--schedule", type=str, default="linear", help="beta schedule type"
+    )
+    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument(
+        "--hl",
+        type=list,
+        default=[2, 128, 128, 128, 2],
+        help="hidden layers size for noise prediction",
+    )
     args = parser.parse_args()
     return args
 
+
 def load_dataset(dataset_name, num_samples, batch_size, random_state):
-    '''
+    """
     Loading the dataset for given argeparse properties
 
     Args:
-        dataset_name (str): name of the dataset 
+        dataset_name (str): name of the dataset
         num_samples (int): number of samples you want
-        batch_size (int) : batch size for the dataset 
+        batch_size (int) : batch size for the dataset
         random_state (int): random state fro reproducibility
-    '''
+    """
     if dataset_name == "Banana_with_two_circles":
         ds = BananaWithTwoCirclesDataset(num_samples, random_state)
         X = ds.generate()
@@ -124,12 +178,20 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
     X_train, _ = train_test_split(X, test_size=0.2)
     X_train = torch.tensor(X_train).float()
     train_set = TensorDataset(X_train)
-    train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=2, pin_memory=True)
+    train_loader = DataLoader(
+        train_set,
+        batch_size=batch_size,
+        drop_last=True,
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True,
+    )
 
     return ds, train_loader
 
+
 def create_model(loss_type, schedule_type, learning_rate, num_features):
-    '''
+    """
     Creating the DDPM model instance for the training
 
     Args:
@@ -140,27 +202,38 @@ def create_model(loss_type, schedule_type, learning_rate, num_features):
 
     Returns:
         torch.model: model instanace
-    '''
-    eps_model = ConditionalDenseModel(num_features, activation='relu', embed_dim=10)
-    betas = make_beta_schedule(num_steps=1000, mode=schedule_type, beta_range=(1e-04, 0.02))
+    """
+    eps_model = ConditionalDenseModel(num_features, activation="relu", embed_dim=10)
+    betas = make_beta_schedule(
+        num_steps=1000, mode=schedule_type, beta_range=(1e-04, 0.02)
+    )
 
-    ddpm_model = ddpm(eps_model=eps_model, betas=betas, criterion='mse', lr=learning_rate, loss_type=loss_type)
+    ddpm_model = ddpm(
+        eps_model=eps_model,
+        betas=betas,
+        criterion="mse",
+        lr=learning_rate,
+        loss_type=loss_type,
+    )
 
     return ddpm_model
+
 
 def train(model, train_loader, device, num_epochs=1000):
     model.to(device)
     iters = len(train_loader)
     model.train()
     for epoch in range(num_epochs):
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", dynamic_ncols=True)
+        pbar = tqdm(
+            train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", dynamic_ncols=True
+        )
         running_loss = 0
         for batch in pbar:
             x_batch = torch.stack(batch).to(device)
             loss, simple_loss, norm_loss = model.train_step(x_batch)
             running_loss += loss
             pbar.set_postfix(loss=running_loss / (pbar.n + 1))
-            
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -181,9 +254,8 @@ if __name__ == "__main__":
     # ds.plot_dataset()
     model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
     print(model)
-    device = f'cuda:{args.gpu_id}' if torch.cuda.is_available() else "cpu"
+    device = f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu"
     train(model, X, device, num_epochs=10)
-
 
 
 # def train(ddpm, device, num_epochs=1000):
