@@ -1,6 +1,9 @@
 import argparse
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -187,7 +190,7 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
         pin_memory=True,
     )
 
-    return ds, train_loader
+    return ds, train_loader , X_train
 
 
 def create_model(loss_type, schedule_type, learning_rate, num_features):
@@ -234,6 +237,20 @@ def train(model, train_loader, device, num_epochs=1000):
             running_loss += loss
             pbar.set_postfix(loss=running_loss / (pbar.n + 1))
 
+def plot_step_by_step_noise(x_noisy, path):
+    plot_steps = range(0, 1001, 20)
+    colors = plt.cm.cividis(np.linspace(0.0, 1, len(plot_steps)))
+    for time_idx, color in zip(plot_steps, colors):
+        samples = x_noisy[time_idx].numpy()
+        plt.scatter(samples[:,0], samples[:,1], s=4, edgecolors='none', alpha=0.5, color=color)
+        plt.xlim(-3, 3)
+        plt.ylim(-3, 3)
+        plt.title('{} steps'.format(time_idx))
+        # ax.set(xticks=[], yticks=[], xlabel='', ylabel='')
+        plt.tight_layout()
+        plt.savefig(f"{path}/forward_diff_step_{time_idx}.png")
+        plt.clf()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -249,13 +266,36 @@ if __name__ == "__main__":
     print(f"Learning Rate: {args.lr}")
     print(f"Hidden Layer Dims: {args.hl}")
 
-    ds, X = load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
+    # # Check CUDA availability and set device
+    # if not torch.cuda.is_available():
+    #     print("CUDA is not available. Falling back to CPU.")
+    #     device = "cpu"
+    # else:
+    #     if args.gpu_id >= torch.cuda.device_count():
+    #         print(f"GPU ID {args.gpu_id} is invalid. Using GPU ID 0.")
+    #         device = "cuda:0"
+    #     else:
+    #         device = f"cuda:{args.gpu_id}"
+
+    ds, X, X_train= load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
     print(type(X))
     # ds.plot_dataset()
     model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
     print(model)
     device = f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu"
     train(model, X, device, num_epochs=10)
+
+    main_path = f"{args.log_dir}/{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}"
+    os.makedirs(main_path, exist_ok=True)
+
+    path_plots = f"{main_path}/plots"
+    os.makedirs(path_plots, exist_ok=True)
+
+    x_noisy = model.diffuse_all_steps(X_train)
+    plot_step_by_step_noise(x_noisy, path_plots)
+
+
+
 
 
 # def train(ddpm, device, num_epochs=1000):
