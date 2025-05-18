@@ -241,7 +241,7 @@ def plot_step_by_step_noise(x_noisy, path):
     plot_steps = range(0, 1001, 20)
     colors = plt.cm.cividis(np.linspace(0.0, 1, len(plot_steps)))
     for time_idx, color in zip(plot_steps, colors):
-        samples = x_noisy[time_idx].numpy()
+        samples = x_noisy[time_idx].cpu().numpy()
         plt.scatter(samples[:,0], samples[:,1], s=4, edgecolors='none', alpha=0.5, color=color)
         plt.xlim(-3, 3)
         plt.ylim(-3, 3)
@@ -250,6 +250,8 @@ def plot_step_by_step_noise(x_noisy, path):
         plt.tight_layout()
         plt.savefig(f"{path}/forward_diff_step_{time_idx}.png")
         plt.clf()
+
+
 
 
 if __name__ == "__main__":
@@ -291,8 +293,11 @@ if __name__ == "__main__":
     path_plots = f"{main_path}/plots"
     os.makedirs(path_plots, exist_ok=True)
 
+    X_train = X_train.to(device)
     x_noisy = model.diffuse_all_steps(X_train)
     plot_step_by_step_noise(x_noisy, path_plots)
+
+
 
 
 
