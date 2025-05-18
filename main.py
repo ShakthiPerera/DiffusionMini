@@ -4,6 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from datetime import datetime
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -27,6 +28,14 @@ from datasets import (
 from models import ConditionalDenseModel
 from functions import make_beta_schedule
 from runners.ddpm_default import DDPM as ddpm
+from functions.stat import (
+    kurtosis_,
+    whiteness_measures,
+    isotropy,
+    metric_plot,
+    kurtosis_plot
+)
+from prdc import compute_prdc
 
 
 def parse_args():
@@ -59,6 +68,22 @@ def parse_args():
                 f"loss_type must be 'default' or 'iso', got {x}"
             )
         return x
+    
+    def valid_date(x):
+        """Validate date in YYYY-MM-DD format."""
+        try:
+            datetime.strptime(x, "%Y-%m-%d")
+            return x
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"Date must be in YYYY-MM-DD format, got {x}")
+
+    def valid_time(x):
+        """Validate time in HH:MM:SS format."""
+        try:
+            datetime.strptime(x, "%H:%M:%S")
+            return x
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"Time must be in HH:MM:SS format, got {x}")
 
     parser = argparse.ArgumentParser(description="Model training script")
 
@@ -189,7 +214,6 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
         num_workers=2,
         pin_memory=True,
     )
-
     return ds, train_loader , X_train
 
 
@@ -266,11 +290,6 @@ def plot_step_by_step_noise(x_noisy,x_denoise,path):
         plt.clf()
 
 
-
-
-
-
-
 if __name__ == "__main__":
     args = parse_args()
     print(f"Dataset: {args.dataset}")
@@ -284,17 +303,6 @@ if __name__ == "__main__":
     print(f"Batch Size: {args.batch_size}")
     print(f"Learning Rate: {args.lr}")
     print(f"Hidden Layer Dims: {args.hl}")
-
-    # # Check CUDA availability and set device
-    # if not torch.cuda.is_available():
-    #     print("CUDA is not available. Falling back to CPU.")
-    #     device = "cpu"
-    # else:
-    #     if args.gpu_id >= torch.cuda.device_count():
-    #         print(f"GPU ID {args.gpu_id} is invalid. Using GPU ID 0.")
-    #         device = "cuda:0"
-    #     else:
-    #         device = f"cuda:{args.gpu_id}"
 
     ds, X, X_train= load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
     print(type(X))
@@ -314,6 +322,116 @@ if __name__ == "__main__":
     x_noisy = model.diffuse_all_steps(X_train)
     x_denoise, x_eps = model.denoise_all_steps(torch.randn(10000, 2).to(device))
     plot_step_by_step_noise(x_noisy, x_denoise, path_plots)
+
+    model.eval()
+    ds, _, X_test = load_dataset(args.dataset, args.num_samples, args.batch_size, args.seed)
+    X_test = X_test.to(device)
+    x_gen = model.generate(sample_shape=X_test[0].shape, num_samples=10000)
+    prdc_ = compute_prdc(real_features=X_test.cpu().numpy(), fake_features=x_gen.cpu().numpy(), nearest_k=5)
+    print(f"PRDC: {prdc_}")
+
+    prdc_file_path = f"{main_path}/prdc_metrics.txt"
+    os.makedirs(os.path.dirname(prdc_file_path), exist_ok=True)
+    with open(prdc_file_path, 'w') as f:
+        f.write("PRDC Metrics:\n")
+        f.write(f"Precision: {prdc_['precision']:.6f}\n")
+        f.write(f"Recall: {prdc_['recall']:.6f}\n")
+        f.write(f"Density: {prdc_['density']:.6f}\n")
+        f.write(f"Coverage: {prdc_['coverage']:.6f}\n")
+
+
+    kurtosis_values_x = np.zeros(model.num_steps)
+    kurtosis_values_y = np.zeros(model.num_steps)
+    kurt_norms = np.zeros(model.num_steps)
+    iso_ratio = np.zeros(model.num_steps)
+    frobenius_norm_difference = np.zeros(model.num_steps)
+    iso_values = np.zeros(model.num_steps)
+
+    data_after_one_step = X_train
+
+    batch_kurtosis = kurtosis_(data_after_one_step.cpu().numpy())
+    kurt_norm = np.sqrt(np.vdot(batch_kurtosis, batch_kurtosis))
+    iso_r, fro_n = whiteness_measures(data_after_one_step.cpu().numpy())
+    batch_isotropy = isotropy(data_after_one_step)
+
+    kurtosis_values_x[0] = batch_kurtosis[0]
+    kurtosis_values_y[0] = batch_kurtosis[1]
+    kurt_norms[0] = kurt_norm
+    iso_ratio[0] = iso_r
+    frobenius_norm_difference[0] = fro_n
+    iso_values[0] = batch_isotropy
+
+    time_steps = model.num_steps
+
+    for index in range(1, time_steps):
+        data_after_one_step = x_noisy[index]
+
+        batch_kurtosis = kurtosis_(data_after_one_step.cpu().numpy())
+        kurt_norm = np.sqrt(np.vdot(batch_kurtosis, batch_kurtosis))
+        iso_r, fro_n = whiteness_measures(data_after_one_step.cpu().numpy())
+        batch_isotropy = isotropy(data_after_one_step)
+
+        kurtosis_values_x[index] = batch_kurtosis[0]
+        kurtosis_values_y[index] = batch_kurtosis[1]
+        kurt_norms[index] = kurt_norm
+        iso_ratio[index] = iso_r
+        frobenius_norm_difference[index] = fro_n
+        iso_values[index] = batch_isotropy
+
+
+    kurtosis_plot(kurtosis_values_x, 'Kurtosis in x', (-3, 3), '01_forward_kurtosis_in_x',path_plots)
+    kurtosis_plot(kurtosis_values_y, 'Kurtosis in y', (-3, 3), '02_forward_kurtosis_in_y',path_plots)
+    kurtosis_plot(kurt_norms, 'Kurtosis Norm', (-3, 3), '03_forward_kurtosis_norm',path_plots)
+    metric_plot(iso_ratio, 'Isotropy Ratio', (1.0, 2.0), '04_forward_isotropy_ratio', path_plots)
+    metric_plot(frobenius_norm_difference, 'Frobenius_norm', (-0.1, 1.25), '05_forward_forbenius_norm',path_plots)
+    metric_plot(iso_values, 'Isotropy Values',None ,'06_forward_isotropy_values',path_plots)
+
+    
+    kurtosis_values_x = np.zeros(model.num_steps)
+    kurtosis_values_y = np.zeros(model.num_steps)
+    kurt_norms = np.zeros(model.num_steps)
+    iso_ratio = np.zeros(model.num_steps)
+    frobenius_norm_difference = np.zeros(model.num_steps)
+    iso_values = np.zeros(model.num_steps)
+
+    data_after_one_step = x_denoise[999]
+
+    batch_kurtosis = kurtosis_(data_after_one_step.cpu().numpy())
+    kurt_norm = np.sqrt(np.vdot(batch_kurtosis, batch_kurtosis))
+    iso_r, fro_n = whiteness_measures(data_after_one_step.cpu().numpy())
+    batch_isotropy = isotropy(data_after_one_step)
+
+    kurtosis_values_x[999] = batch_kurtosis[0]
+    kurtosis_values_y[999] = batch_kurtosis[1]
+    kurt_norms[999] = kurt_norm
+    iso_ratio[999] = iso_r
+    frobenius_norm_difference[999] = fro_n
+    iso_values[999] = batch_isotropy
+
+    for index in reversed(range(time_steps-1)):
+        data_after_one_step = x_denoise[index]
+
+        batch_kurtosis = kurtosis_(data_after_one_step.cpu().numpy())
+        kurt_norm = np.sqrt(np.vdot(batch_kurtosis, batch_kurtosis))
+        iso_r, fro_n = whiteness_measures(data_after_one_step.cpu().numpy())
+        batch_isotropy = isotropy(data_after_one_step)
+
+        kurtosis_values_x[index] = batch_kurtosis[0]
+        kurtosis_values_y[index] = batch_kurtosis[1]
+        kurt_norms[index] = kurt_norm
+        iso_ratio[index] = iso_r
+        frobenius_norm_difference[index] = fro_n
+        iso_values[index] = batch_isotropy
+
+    kurtosis_plot(kurtosis_values_x, 'Kurtosis in x', (-3, 3), '01_reverse_kurtosis_in_x',path_plots)
+    kurtosis_plot(kurtosis_values_y, 'Kurtosis in y', (-3, 3), '02_reverse_kurtosis_in_y',path_plots)
+    kurtosis_plot(kurt_norms, 'Kurtosis Norm', (-3, 3), '03_reverse_kurtosis_norm',path_plots)
+    metric_plot(iso_ratio, 'Isotropy Ratio', (1.0, 2.0), '04_reverse_isotropy_ratio',path_plots, smoothed = True, window_size = 5,)
+    metric_plot(frobenius_norm_difference, 'Frobenius_norm_difference', (-0.1, 1.25), '05_reverse_forbenius_norm', path_plots)
+    metric_plot(iso_values, 'Isotropy Values',None ,'06_reverse_isotropy_values', path_plots)
+
+
+
 
 
 

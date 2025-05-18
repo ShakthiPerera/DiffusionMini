@@ -27,7 +27,7 @@ def isotropy(data):
 
 
 def metric_plot(
-    metric_values, metric_name, ylim, save_name, smoothed=False, window_size=50
+    metric_values, metric_name, ylim, save_name, path = ".", smoothed=False, window_size=50,
 ):
     plt.figure(figsize=(8, 6))
 
@@ -53,7 +53,7 @@ def metric_plot(
     plt.savefig(f"{path}/{save_name}.png")
 
 
-def kurtosis_plot(metric_values, metric_name, ylim, save_name):
+def kurtosis_plot(metric_values, metric_name, ylim, save_name, path = "."):
     plt.figure(figsize=(8, 6))
 
     # Define the window size for the moving average
