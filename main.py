@@ -146,6 +146,18 @@ def parse_args():
         default=[2, 128, 128, 128, 2],
         help="hidden layers size for noise prediction",
     )
+    parser.add_argument(
+        "--date",
+        type=valid_date,
+        default=datetime.now().strftime("%Y-%m-%d"),
+        help="Date in YYYY-MM-DD format (default: current date)",
+    )
+    parser.add_argument(
+        "--time",
+        type=valid_time,
+        default=datetime.now().strftime("%H:%M:%S"),
+        help="Time in HH:MM:SS format (default: current time)",
+    )
     args = parser.parse_args()
     return args
 
@@ -312,7 +324,8 @@ if __name__ == "__main__":
     device = f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu"
     train(model, X, device, num_epochs=10)
 
-    main_path = f"{args.log_dir}/{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}"
+    timestamp = f"{args.date.replace('-', '')}_{args.time.replace(':', '')}"
+    main_path = f"{args.log_dir}/{timestamp}_{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}_{args.num_samples}_{args.seed}_{args.batch_size}_{args.lr}_{args.hl}"
     os.makedirs(main_path, exist_ok=True)
 
     path_plots = f"{main_path}/plots"
