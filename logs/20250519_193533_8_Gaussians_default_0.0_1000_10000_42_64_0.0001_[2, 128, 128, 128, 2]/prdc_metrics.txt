@@ -1,5 +1,0 @@
-PRDC Metrics:
-Precision: 0.670900
-Recall: 0.999000
-Density: 0.523640
-Coverage: 0.724750

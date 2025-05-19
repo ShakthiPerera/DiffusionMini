@@ -301,6 +301,20 @@ def plot_step_by_step_noise(x_noisy,x_denoise,path):
         plt.savefig(f"{path}/reverse_diff_steps_part_{time_idx}.png")
         plt.clf()
 
+def plot_real_generated_data(x_gen,X_test,path):
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.scatter(x_gen[:,0].cpu().numpy(), x_gen[:,1].cpu().numpy(), s=3,
+        edgecolors='none', alpha=0.7, color=plt.cm.cividis(0.0), label='Generated')
+    ax.scatter(X_test[:,0].cpu().numpy(), X_test[:,1].cpu().numpy(), s=3,
+        edgecolors='none', alpha=0.7, color=plt.cm.cividis(0.8), label='Real')
+    ax.set(xlim=(-1.25, 1.25), ylim=(-1.25, 1.25))
+    ax.set_aspect('equal', adjustable='box')
+    ax.grid(visible=True, which='both', color='gray', alpha=0.2, linestyle='-')
+    ax.set_axisbelow(True)
+    ax.legend()
+    plt.savefig(f"{path}/generated_and_real_dataset.png")
+    fig.tight_layout()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -322,7 +336,7 @@ if __name__ == "__main__":
     model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
     print(model)
     device = f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu"
-    train(model, X, device, num_epochs=10)
+    train(model, X, device, num_epochs=args.num_epoch)
 
     timestamp = f"{args.date.replace('-', '')}_{args.time.replace(':', '')}"
     main_path = f"{args.log_dir}/{timestamp}_{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}_{args.num_samples}_{args.seed}_{args.batch_size}_{args.lr}_{args.hl}"
@@ -351,6 +365,8 @@ if __name__ == "__main__":
         f.write(f"Recall: {prdc_['recall']:.6f}\n")
         f.write(f"Density: {prdc_['density']:.6f}\n")
         f.write(f"Coverage: {prdc_['coverage']:.6f}\n")
+
+    plot_real_generated_data(x_gen,X_test,path_plots)
 
 
     kurtosis_values_x = np.zeros(model.num_steps)
