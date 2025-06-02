@@ -8,6 +8,7 @@ from datetime import datetime
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
+from torch.amp import GradScaler, autocast
 
 from datasets import (
     BananaWithTwoCirclesDataset,
@@ -223,7 +224,7 @@ def load_dataset(dataset_name, num_samples, batch_size, random_state):
         batch_size=batch_size,
         drop_last=True,
         shuffle=True,
-        num_workers=2,
+        num_workers=7,
         pin_memory=True,
     )
     return ds, train_loader , X_train
@@ -260,18 +261,43 @@ def create_model(loss_type, schedule_type, learning_rate, num_features):
 
 def train(model, train_loader, device, num_epochs=1000):
     model.to(device)
+    scaler = GradScaler()  # For mixed precision
+    train_losses = torch.zeros(num_epochs)
+    diff_losses = torch.zeros(num_epochs)
+    norm_losses = torch.zeros(num_epochs)
     iters = len(train_loader)
     model.train()
     for epoch in range(num_epochs):
         pbar = tqdm(
             train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", dynamic_ncols=True
         )
-        running_loss = 0
+        running_loss,simple_loss_,norm_loss_= 0.0, 0.0, 0.0
         for batch in pbar:
             x_batch = torch.stack(batch).to(device)
-            loss, simple_loss, norm_loss = model.train_step(x_batch)
-            running_loss += loss
+            with autocast(device_type='cuda'): # Enable mixed precision
+                loss, simple_loss, norm_loss = model.train_step(x_batch)
+            scaler.scale(loss).backward()
+            scaler.step(model.optimizer)
+            scaler.update()
+            model.optimizer.zero_grad()
+            # loss, simple_loss, norm_loss = model.train_step(x_batch)
+            running_loss += loss.item()
+            simple_loss_ += simple_loss.item()
+            norm_loss_ += norm_loss.item()
             pbar.set_postfix(loss=running_loss / (pbar.n + 1))
+        
+        loss = running_loss/iters
+        avg_diff_loss = simple_loss_ / iters
+        avg_norm_loss = norm_loss_ / iters
+
+        train_losses[epoch] = running_loss / iters
+        diff_losses[epoch] = avg_diff_loss
+        norm_losses[epoch] = avg_norm_loss
+    
+    return train_losses , diff_losses, norm_losses
+
+
+        
 
 def plot_step_by_step_noise(x_noisy,x_denoise,path):
     plot_steps = range(0, 1001, 20)
@@ -315,6 +341,40 @@ def plot_real_generated_data(x_gen,X_test,path):
     plt.savefig(f"{path}/generated_and_real_dataset.png")
     fig.tight_layout()
 
+def plot_losses(train_losses, diff_losses, norm_losses, path):
+    window_size = 30
+    # Compute the moving average
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    # ax.plot(ddpm.train_losses[:], alpha=0.7, label='train')
+    smoothed_train_loss = np.convolve((train_losses)[:], np.ones(window_size)/window_size, mode='same')
+    ax.plot(torch.tensor(smoothed_train_loss)[:], alpha=0.7, label='smoothed_train_loss')
+
+    # ax.plot(torch.tensor(diff_loss)[:], alpha=0.7, label='simple_diff_loss')
+    smoothed_diff_loss = np.convolve((diff_losses)[:], np.ones(window_size)/window_size, mode='same')
+    ax.plot(torch.tensor(smoothed_diff_loss)[:], alpha=0.7, label='smoothed_diff_loss')
+    # ax.plot(ddpm.val_losses, alpha=0.7, label='val')
+    ax.set(xlabel='step', ylabel='loss')
+    ax.set_xlim([0, len(train_losses)])
+    ax.set_ylim([0.1, 0.2])
+    ax.legend()
+    ax.grid(visible=True, which='both', color='gray', alpha=0.2, linestyle='-')
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    plt.savefig(f"{path}/train_loss_and_diff_loss.png")
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    smoothed_norm_loss = np.convolve((norm_losses.clone().detach().numpy())[:], np.ones(window_size)/window_size, mode='same')
+    ax.plot(smoothed_norm_loss, alpha=0.7, label='norm_loss')
+    ax.set(xlabel='step', ylabel='loss')
+    ax.set_xlim([0, len(train_losses)])
+    ax.set_ylim([0.0, 0.05])
+    ax.legend()
+    ax.grid(visible=True, which='both', color='gray', alpha=0.2, linestyle='-')
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    plt.savefig(f"{path}/norm_loss.png")
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -336,10 +396,10 @@ if __name__ == "__main__":
     model = create_model(args.loss_type, args.schedule, args.lr, args.hl)
     print(model)
     device = f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu"
-    train(model, X, device, num_epochs=args.num_epoch)
+    train_losses , diff_losses, norm_losses = train(model, X, device, num_epochs=args.num_epoch)
 
     timestamp = f"{args.date.replace('-', '')}_{args.time.replace(':', '')}"
-    main_path = f"{args.log_dir}/{timestamp}_{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}_{args.num_samples}_{args.seed}_{args.batch_size}_{args.lr}_{args.hl}"
+    main_path = f"{args.log_dir}/{timestamp}_{args.dataset}_{args.loss_type}_{args.reg}_{args.num_epoch}_{args.num_samples}_{args.seed}_{args.batch_size}_{args.lr}"
     os.makedirs(main_path, exist_ok=True)
 
     path_plots = f"{main_path}/plots"
@@ -367,6 +427,9 @@ if __name__ == "__main__":
         f.write(f"Coverage: {prdc_['coverage']:.6f}\n")
 
     plot_real_generated_data(x_gen,X_test,path_plots)
+
+    # Plotting the training losses
+    plot_losses(train_losses, diff_losses, norm_losses, path_plots)
 
 
     kurtosis_values_x = np.zeros(model.num_steps)

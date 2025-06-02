@@ -93,3 +93,4 @@ def kurtosis_plot(metric_values, metric_name, ylim, save_name, path = "."):
         plt.ylim(*ylim)
     plt.grid(True)
     plt.savefig(f"{path}/{save_name}.png")
+
